@@ -1,4 +1,13 @@
 <!DOCTYPE html>
+<!--
+  =========================================================================
+  ระบบพิมพ์ฉลากยา แผนกทันตกรรม โรงพยาบาลสันกำแพง (Dental Label Printer)
+  =========================================================================
+  ออกแบบและพัฒนาโดย: ภญ.ธมลวรรณ จันทร์แก้ว (โรงพยาบาลสันกำแพง)
+  ระบบนี้ถือเป็นทรัพย์สินทางปัญญาของผู้พัฒนา ห้ามคัดลอก ดัดแปลงหรือนำไปใช้โดยไม่ได้รับอนุญาต
+  ผู้ที่ได้รับอนุญาตให้ใช้หรือดัดแปลง ต้องคงเครดิตนี้ไว้ แม้จะเปลี่ยนชื่อโปรแกรมหรือโลโก้
+  ลิขสิทธิ์ © 2569 (2026) สงวนสิทธิ์ทุกประการ
+-->
 <html lang="th">
 <head>
 <meta charset="UTF-8">
@@ -8,8 +17,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap">
 <style>
 :root {
-    --bg: #f4f5f7; --panel: #ffffff; --line: #d9dce1; --text: #1d2330; --muted: #6b7280;
-    --primary: #c2185b; --primary-soft: #fce4ec; --ok: #2e7d32; --warn: #b26a00;
+    --bg: #f0f6f5; --panel: #ffffff; --line: #d2e2df; --text: #15302c; --muted: #5d7470;
+    --primary: #00796b; --primary-dark: #00574d; --primary-soft: #e0f2f1; --primary-mute: #8fc9c1; --section: #e6f1ef;
+    --ok: #2e7d32; --warn: #b26a00;
     --font: 'Sarabun', 'Tahoma', sans-serif;
     /* label calibration, overwritten from settings */
     --lbl-top: 0mm; --lbl-side: 6mm; --lbl-bottom: 10mm; --lbl-scale: 1; --lbl-rotate: 0deg; --lbl-shift: 0mm;
@@ -19,14 +29,32 @@ html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 
 button { font-family: var(--font); font-size: .95rem; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 7px 12px; border-radius: 6px; }
 button:hover { border-color: var(--primary); }
 button.primary { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
-button.primary:disabled { background: #e0a3bb; border-color: #e0a3bb; cursor: not-allowed; }
+button.primary:hover:not(:disabled) { background: var(--primary-dark); border-color: var(--primary-dark); }
+button.primary:disabled { background: var(--primary-mute); border-color: var(--primary-mute); cursor: not-allowed; }
+input:focus, select:focus { outline: 2px solid var(--primary-mute); outline-offset: 0; border-color: var(--primary); }
 button.danger { color: #b00020; }
 input, select { font-family: var(--font); font-size: .95rem; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--text); }
 .kbd { font-size: .7rem; opacity: .8; margin-left: 6px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; }
 
 /* ── Top bar ── */
-.top-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-.top-bar h1 { font-size: 1.15rem; margin: 0 12px 0 0; }
+.top-bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 16px; background: var(--panel); border-bottom: 3px solid var(--primary); }
+.top-bar .brand { margin-right: 12px; }
+.top-bar h1 { font-size: 1.15rem; margin: 0; color: var(--primary-dark); }
+.byline { color: var(--muted); font-size: .8rem; margin: 0; }
+.byline .dot { margin: 0 5px; }
+
+/* ── Credit footer ── */
+.page-foot { background: var(--primary-soft); border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; padding: 14px 16px; margin-top: 8px; }
+.page-foot p { margin: 0; }
+@media screen { body { display: flex; flex-direction: column; min-height: 100vh; } .app { flex: 1; } }
+.foot-center { text-align: center; }
+.foot-center + .foot-center { margin-top: 4px; }
+.foot-for { color: var(--text); font-weight: 600; }
+.foot-row { display: flex; justify-content: space-between; align-items: center; gap: 8px 24px; flex-wrap: wrap; margin-top: 12px; }
+.credit-name { color: var(--text); font-weight: 700; }
+.credit-ip { cursor: help; margin-left: 10px; }
+.credit-i { display: inline-block; margin-left: 6px; color: var(--primary); }
+.foot-terms { max-width: 520px; text-align: center; }
 .top-bar .spacer { flex: 1; }
 
 /* ── Layout ── */
@@ -41,7 +69,7 @@ table.drugs { width: 100%; border-collapse: collapse; }
 table.drugs th, table.drugs td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
 table.drugs th { font-size: .8rem; color: var(--muted); font-weight: 600; }
 table.drugs td.num, table.drugs th.num { text-align: center; }
-table.drugs tr.section td { background: #eef0f3; font-weight: 700; font-size: .9rem; }
+table.drugs tr.section td { background: var(--section); color: var(--primary-dark); font-weight: 700; font-size: .9rem; }
 table.drugs tr.on td { background: var(--primary-soft); }
 table.drugs select[data-qty] { width: 64px; text-align: center; cursor: pointer; }
 table.drugs input[data-exp] { width: 150px; }
@@ -54,7 +82,7 @@ table.drugs input[data-exp] { width: 150px; }
 .preview-item { position: relative; margin-bottom: 12px; }
 .badge { position: absolute; top: 6px; right: 6px; z-index: 2; background: var(--primary); color: #fff; font-weight: 700; border-radius: 12px; padding: 1px 9px; font-size: .85rem; }
 .empty { color: var(--muted); text-align: center; padding: 30px 8px; }
-/* pre-printed stock art, screen only */
+/* pre-printed stock art, screen only — stays pink: it shows the real label paper */
 .stock { position: relative; width: 90mm; height: 60mm; background: #fff; border-radius: 3mm; box-shadow: 0 1px 3px rgba(0,0,0,.15); overflow: hidden; }
 .stock::before { content: ''; position: absolute; inset: 1.5mm; border: .4mm solid #e48ab0; border-radius: 2mm; pointer-events: none; }
 .stock .stock-head { position: absolute; top: 2.6mm; left: 0; right: 0; text-align: center; color: #d0457f; font-size: 9pt; pointer-events: none; }
@@ -71,7 +99,7 @@ table.drugs input[data-exp] { width: 150px; }
 .l-fixed .w { font-weight: 700; }
 
 /* ── Modals ── */
-.modal { position: fixed; inset: 0; z-index: 20; background: rgba(20,24,33,.45); display: none; align-items: flex-start; justify-content: center; padding: 30px 12px; overflow-y: auto; }
+.modal { position: fixed; inset: 0; z-index: 20; background: rgba(10,40,36,.45); display: none; align-items: flex-start; justify-content: center; padding: 30px 12px; overflow-y: auto; }
 .modal.open { display: flex; }
 .modal-box { background: var(--panel); border-radius: 10px; width: 100%; max-width: 1180px; padding: 16px; }
 .modal-box.small { max-width: 380px; }
@@ -94,7 +122,7 @@ table.admin select { font-size: .85rem; padding: 3px 4px; }
 .log-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .log-table td, .log-table th { border-bottom: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top; }
 
-#toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1d2330; color: #fff; padding: 9px 16px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30; }
+#toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--primary-dark); color: #fff; padding: 9px 16px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30; }
 #toast.show { opacity: 1; }
 #print-area { display: none; }
 
@@ -113,7 +141,10 @@ table.admin select { font-size: .85rem; padding: 3px 4px; }
 <body>
 
 <div class="top-bar">
-    <h1>ฉลากยา แผนกทันตกรรม</h1>
+    <div class="brand">
+        <h1>ฉลากยา แผนกทันตกรรม</h1>
+        <p class="byline">โรงพยาบาลสันกำแพง<span class="dot">·</span>โดย ภญ.ธมลวรรณ จันทร์แก้ว</p>
+    </div>
     <button id="btn-print" class="primary" disabled>พิมพ์ฉลาก <span id="print-count"></span><span class="kbd">Ctrl+Enter</span></button>
     <button id="btn-reprint">พิมพ์ซ้ำครั้งล่าสุด</button>
     <button id="btn-clear">ล้างค่า<span class="kbd">Esc</span></button>
@@ -138,6 +169,16 @@ table.admin select { font-size: .85rem; padding: 3px 4px; }
         <div id="previews"></div>
     </div>
 </div>
+
+<footer class="page-foot">
+    <p class="foot-center">ระบบพิมพ์ฉลากยา แผนกทันตกรรม โรงพยาบาลสันกำแพง · ทำงานในเบราว์เซอร์ทั้งหมด ไม่เก็บข้อมูลผู้ป่วย</p>
+    <p class="foot-center foot-for">พัฒนาขึ้นเฉพาะสำหรับ แผนกทันตกรรม โรงพยาบาลสันกำแพง</p>
+    <div class="foot-row">
+        <p>Designed &amp; Developed by <span class="credit-name">ภญ.ธมลวรรณ จันทร์แก้ว</span>
+            <span class="credit-ip" title="ระบบนี้ถือเป็นทรัพย์สินทางปัญญาของผู้พัฒนา ห้ามคัดลอก ดัดแปลงหรือนำไปใช้โดยไม่ได้รับอนุญาต">© 2569 (2026) สงวนลิขสิทธิ์<span class="credit-i" aria-hidden="true">ⓘ</span></span></p>
+        <p class="foot-terms">ผู้พัฒนา: ภญ.ธมลวรรณ จันทร์แก้ว (โรงพยาบาลสันกำแพง) · "ระบบนี้ถือเป็นทรัพย์สินทางปัญญาของผู้พัฒนา ห้ามคัดลอก ดัดแปลง หรือนำไปใช้โดยไม่ได้รับอนุญาต" · ผู้ที่ได้รับอนุญาตให้ใช้หรือดัดแปลง ต้องคงเครดิตนี้ไว้ แม้จะเปลี่ยนชื่อโปรแกรมหรือโลโก้</p>
+    </div>
+</footer>
 
 <!-- Log -->
 <div class="modal" id="log-modal">
@@ -239,12 +280,14 @@ function store(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
 }
 
-// v2: label moved down below the pink header; settings saved before that take the new top margin once
-const SETTINGS_VERSION = 2;
-const DEFAULT_SETTINGS = { v: SETTINGS_VERSION, top: 8, side: 6, scale: 100, rotate: false, shift: 0, bottom: 5 };
+// v2 briefly forced the label down (top 8 / bottom 5); v3 puts it back at the top edge.
+// Settings from v1 keep their own calibration.
+const SETTINGS_VERSION = 3;
+const DEFAULT_SETTINGS = { v: SETTINGS_VERSION, top: 0, side: 6, scale: 100, rotate: false, shift: 0, bottom: 10 };
 let settings = { ...DEFAULT_SETTINGS, ...load(LS.settings, {}) };
 if ((settings.v || 1) < SETTINGS_VERSION) {
-    settings = { ...settings, v: SETTINGS_VERSION, top: DEFAULT_SETTINGS.top, bottom: DEFAULT_SETTINGS.bottom };
+    if (settings.v === 2) { settings.top = DEFAULT_SETTINGS.top; settings.bottom = DEFAULT_SETTINGS.bottom; }
+    settings.v = SETTINGS_VERSION;
     delete settings.dept;
     store(LS.settings, settings);
 }
