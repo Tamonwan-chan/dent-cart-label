@@ -69,7 +69,6 @@ table.drugs input[data-exp] { width: 150px; }
 .l-dir { text-align: center; font-size: calc(12pt * var(--lbl-scale)); font-weight: 700; margin-top: 2.5mm; }
 .l-fixed { text-align: center; font-size: calc(9.5pt * var(--lbl-scale)); margin-top: 2.5mm; }
 .l-fixed .w { font-weight: 700; }
-.l-foot { margin-top: auto; display: flex; justify-content: space-between; gap: 2mm; font-size: calc(8pt * var(--lbl-scale)); }
 
 /* ── Modals ── */
 .modal { position: fixed; inset: 0; z-index: 20; background: rgba(20,24,33,.45); display: none; align-items: flex-start; justify-content: center; padding: 30px 12px; overflow-y: auto; }
@@ -182,12 +181,11 @@ table.admin select { font-size: .85rem; padding: 3px 4px; }
         <div id="tab-settings" class="admin-tab" hidden>
             <div class="form-grid">
                 <label for="set-top">ระยะขอบบน (มม.) <div class="hint">เว้นที่ให้หัวฉลากสีชมพู</div></label><input id="set-top" type="number" step="0.5" min="0" max="30">
-                <label for="set-bottom">ระยะขอบล่าง (มม.) <div class="hint">ชื่อหน่วยงานและวันเวลาขาด ให้เพิ่มทีละ 1</div></label><input id="set-bottom" type="number" step="0.5" min="0" max="30">
+                <label for="set-bottom">ระยะขอบล่าง (มม.) <div class="hint">ข้อความด้านล่างขาด ให้เพิ่มทีละ 1</div></label><input id="set-bottom" type="number" step="0.5" min="0" max="30">
                 <label for="set-side">ระยะขอบซ้าย-ขวา (มม.)</label><input id="set-side" type="number" step="0.5" min="0" max="15">
                 <label for="set-rotate">หมุนฉลาก 180° <div class="hint">เปิดไว้ถ้าหัวฉลากสีชมพูออกมาอยู่ด้านล่าง</div></label><input id="set-rotate" type="checkbox" style="justify-self:start">
                 <label for="set-shift">เลื่อนซ้าย-ขวา (มม.) <div class="hint">ตัวหนังสือขาดด้านใด ลองใส่ + หรือ − ทีละ 1</div></label><input id="set-shift" type="number" step="0.5" min="-15" max="15">
                 <label for="set-scale">ขนาดตัวอักษร (%)</label><input id="set-scale" type="number" step="5" min="60" max="150">
-                <label for="set-dept">ชื่อหน่วยงานท้ายฉลาก</label><input id="set-dept" type="text">
                 <label for="set-pin">เปลี่ยน PIN ผู้ดูแล <div class="hint">เว้นว่างถ้าไม่เปลี่ยน</div></label><input id="set-pin" type="password" inputmode="numeric" autocomplete="off">
             </div>
             <div class="actions">
@@ -241,8 +239,15 @@ function store(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
 }
 
-const DEFAULT_SETTINGS = { top: 0, side: 6, scale: 100, dept: 'แผนกทันตกรรม', rotate: false, shift: 0, bottom: 10 };
+// v2: label moved down below the pink header; settings saved before that take the new top margin once
+const SETTINGS_VERSION = 2;
+const DEFAULT_SETTINGS = { v: SETTINGS_VERSION, top: 8, side: 6, scale: 100, rotate: false, shift: 0, bottom: 5 };
 let settings = { ...DEFAULT_SETTINGS, ...load(LS.settings, {}) };
+if ((settings.v || 1) < SETTINGS_VERSION) {
+    settings = { ...settings, v: SETTINGS_VERSION, top: DEFAULT_SETTINGS.top, bottom: DEFAULT_SETTINGS.bottom };
+    delete settings.dept;
+    store(LS.settings, settings);
+}
 let list = { updated: '', drugs: [] };   // { updated, drugs }
 let listSource = '';
 const qty  = {};   // id -> labels to print
@@ -320,7 +325,6 @@ function labelHTML(d, stamp, exp) {
         <div class="l-drug"><span>${esc(d.name)} ${esc(d.unit)}</span><span class="pack"># ${esc(d.pack)}</span></div>
         <div class="l-dir">${g.dir.map(line => `<div>${esc(line)}</div>`).join('')}</div>
         <div class="l-fixed">${warns.map(w => `<div class="w">${esc(w)}</div>`).join('')}${d.indication ? `<div>${esc(d.indication)}</div>` : ''}</div>
-        <div class="l-foot"><span>${esc(settings.dept)}</span></div>
     </div>`;
 }
 function stockPreviewHTML(d, stamp, exp) {
@@ -488,7 +492,6 @@ function openAdmin() {
     $('#set-side').value = settings.side;
     $('#set-bottom').value = settings.bottom;
     $('#set-scale').value = settings.scale;
-    $('#set-dept').value = settings.dept;
     $('#set-rotate').checked = settings.rotate;
     $('#set-shift').value = settings.shift;
     $('#set-pin').value = '';
@@ -526,11 +529,11 @@ function saveDrugs() {
 }
 function saveSettings() {
     settings = {
+        v:     SETTINGS_VERSION,
         top:   Number($('#set-top').value)   || 0,
         side:  Number($('#set-side').value)  || 0,
         bottom: Number($('#set-bottom').value) || 0,
         scale: Number($('#set-scale').value) || 100,
-        dept:  $('#set-dept').value.trim(),
         rotate: $('#set-rotate').checked,
         shift: Number($('#set-shift').value) || 0,
     };
