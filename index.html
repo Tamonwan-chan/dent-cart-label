@@ -53,8 +53,10 @@ input, select { font-family: var(--font); font-size: .95rem; padding: 5px 7px; b
 .foot-row { display: flex; justify-content: space-between; align-items: center; gap: 8px 24px; flex-wrap: wrap; margin-top: 12px; }
 .credit-name { color: var(--text); font-weight: 700; }
 .credit-ip { cursor: help; margin-left: 10px; }
-.credit-i { display: inline-block; margin-left: 6px; color: var(--primary); }
-.foot-terms { max-width: 520px; text-align: center; }
+button.credit-i { margin-left: 6px; padding: 0 3px; border: none; border-radius: 50%; background: none; color: var(--primary); font-size: 1rem; line-height: 1; }
+button.credit-i:hover, button.credit-i[aria-expanded="true"] { background: var(--panel); }
+button.credit-i:focus-visible { outline: 2px solid var(--primary); }
+.foot-terms { margin-top: 10px !important; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; text-align: center; color: var(--text); }
 .top-bar .spacer { flex: 1; }
 
 /* ── Layout ── */
@@ -175,9 +177,9 @@ table.admin select { font-size: .85rem; padding: 3px 4px; }
     <p class="foot-center foot-for">พัฒนาขึ้นเฉพาะสำหรับ แผนกทันตกรรม โรงพยาบาลสันกำแพง</p>
     <div class="foot-row">
         <p>Designed &amp; Developed by <span class="credit-name">ภญ.ธมลวรรณ จันทร์แก้ว</span>
-            <span class="credit-ip" title="ระบบนี้ถือเป็นทรัพย์สินทางปัญญาของผู้พัฒนา ห้ามคัดลอก ดัดแปลงหรือนำไปใช้โดยไม่ได้รับอนุญาต">© 2569 (2026) สงวนลิขสิทธิ์<span class="credit-i" aria-hidden="true">ⓘ</span></span></p>
-        <p class="foot-terms">ผู้พัฒนา: ภญ.ธมลวรรณ จันทร์แก้ว (โรงพยาบาลสันกำแพง) · "ระบบนี้ถือเป็นทรัพย์สินทางปัญญาของผู้พัฒนา ห้ามคัดลอก ดัดแปลง หรือนำไปใช้โดยไม่ได้รับอนุญาต" · ผู้ที่ได้รับอนุญาตให้ใช้หรือดัดแปลง ต้องคงเครดิตนี้ไว้ แม้จะเปลี่ยนชื่อโปรแกรมหรือโลโก้</p>
+            <span class="credit-ip">© 2569 (2026) สงวนลิขสิทธิ์</span><button type="button" class="credit-i" id="btn-credit-terms" aria-expanded="false" aria-controls="foot-terms" title="ข้อกำหนดการใช้งาน">ⓘ</button></p>
     </div>
+    <p class="foot-terms" id="foot-terms" hidden>ผู้พัฒนา: ภญ.ธมลวรรณ จันทร์แก้ว (โรงพยาบาลสันกำแพง) · "ระบบนี้ถือเป็นทรัพย์สินทางปัญญาของผู้พัฒนา ห้ามคัดลอก ดัดแปลง หรือนำไปใช้โดยไม่ได้รับอนุญาต" · ผู้ที่ได้รับอนุญาตให้ใช้หรือดัดแปลง ต้องคงเครดิตนี้ไว้ แม้จะเปลี่ยนชื่อโปรแกรมหรือโลโก้</p>
 </footer>
 
 <!-- Log -->
@@ -628,6 +630,12 @@ $('#btn-reprint').addEventListener('click', reprintLast);
 $('#btn-clear').addEventListener('click', clearAll);
 $('#btn-log').addEventListener('click', () => { renderLog(); openModal('#log-modal'); });
 $('#btn-log-csv').addEventListener('click', exportLogCSV);
+$('#btn-credit-terms').addEventListener('click', e => {
+    const terms = $('#foot-terms'), show = terms.hidden;
+    terms.hidden = !show;
+    e.currentTarget.setAttribute('aria-expanded', String(show));
+    if (show) terms.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
 $('#btn-log-clear').addEventListener('click', () => {
     if (confirm('ล้างบันทึกการพิมพ์ทั้งหมด?')) { store(LS.log, []); renderLog(); }
 });
