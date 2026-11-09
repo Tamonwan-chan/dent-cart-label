@@ -44,6 +44,7 @@ table.drugs td.num, table.drugs th.num { text-align: center; }
 table.drugs tr.section td { background: #eef0f3; font-weight: 700; font-size: .9rem; }
 table.drugs tr.on td { background: var(--primary-soft); }
 table.drugs select[data-qty] { width: 64px; text-align: center; cursor: pointer; }
+table.drugs input[data-exp] { width: 150px; }
 .drug-name { font-weight: 600; }
 .drug-sub { color: var(--muted); font-size: .8rem; }
 
@@ -61,8 +62,7 @@ table.drugs select[data-qty] { width: 64px; text-align: center; cursor: pointer;
 
 /* ── Label (same markup on screen and on paper) ── */
 .label { width: 90mm; height: 60mm; padding: var(--lbl-top) var(--lbl-side) var(--lbl-bottom) var(--lbl-side); display: flex; flex-direction: column; overflow: hidden; color: #000; font-family: var(--font); line-height: 1.2; }
-.l-name { display: flex; align-items: flex-end; gap: 2mm; font-size: calc(10.5pt * var(--lbl-scale)); font-weight: 700; }
-.l-name .blank { flex: 1; border-bottom: .3mm dotted #000; height: 1em; margin-bottom: .6mm; }
+.l-top { display: flex; justify-content: space-between; gap: 2mm; font-size: calc(9.5pt * var(--lbl-scale)); font-weight: 700; white-space: nowrap; }
 .l-sep { border-top: .3mm dashed #000; margin: 1.2mm 0 1mm; }
 .l-drug { display: flex; justify-content: space-between; gap: 2mm; font-size: calc(10.5pt * var(--lbl-scale)); font-weight: 700; }
 .l-drug .pack { white-space: nowrap; }
@@ -127,10 +127,10 @@ table.admin select { font-size: .85rem; padding: 3px 4px; }
     <div class="panel">
         <div class="search-row">
             <input id="search" type="search" placeholder="ค้นหาชื่อยา..." autocomplete="off">
-            <span class="hint">ใส่จำนวนฉลากที่ต้องการพิมพ์ในช่อง "พิมพ์"</span>
+            <span class="hint">ใส่วันหมดอายุ และจำนวนฉลากที่ต้องการพิมพ์ในช่อง "พิมพ์"</span>
         </div>
         <table class="drugs">
-            <thead><tr><th>ยา</th><th class="num">บรรจุ</th><th class="num">พิมพ์ (ใบ)</th></tr></thead>
+            <thead><tr><th>ยา</th><th class="num">บรรจุ</th><th class="num">วันหมดอายุ</th><th class="num">พิมพ์ (ใบ)</th></tr></thead>
             <tbody id="drug-rows"></tbody>
         </table>
     </div>
@@ -221,6 +221,7 @@ const DOTS  = '..............';
 const TIMES = 'เช้า   กลางวัน   เย็น   ก่อนนอน';
 const GROUPS = {
     tablet:     { name: 'ยาเม็ด',              sec: 'solid',  dir: [`รับประทานครั้งละ${DOTS}เม็ด`, `วันละ${DOTS}ครั้ง  ก่อนอาหาร/หลังอาหาร`, TIMES], fixed: [] },
+    tablet_prn: { name: 'ยาเม็ด เวลามีอาการ',   sec: 'solid',  dir: [`รับประทานครั้งละ${DOTS}เม็ด`, 'ทุก 4 ถึง 6 ชั่วโมง', 'เวลามีอาการปวดหรือไข้'], fixed: [] },
     tablet_ac:  { name: 'ยาเม็ด ก่อนอาหาร',     sec: 'solid',  dir: [`รับประทานครั้งละ${DOTS}เม็ด`, `วันละ${DOTS}ครั้ง  ก่อนอาหาร`, TIMES], fixed: [] },
     capsule:    { name: 'แคปซูล',              sec: 'solid',  dir: [`รับประทานครั้งละ${DOTS}แคปซูล`, `วันละ${DOTS}ครั้ง  ก่อนอาหาร/หลังอาหาร`, TIMES], fixed: [] },
     capsule_ac: { name: 'แคปซูล ก่อนอาหาร',     sec: 'solid',  dir: [`รับประทานครั้งละ${DOTS}แคปซูล`, `วันละ${DOTS}ครั้ง  ก่อนอาหาร`, TIMES], fixed: [] },
@@ -245,6 +246,7 @@ let settings = { ...DEFAULT_SETTINGS, ...load(LS.settings, {}) };
 let list = { updated: '', drugs: [] };   // { updated, drugs }
 let listSource = '';
 const qty  = {};   // id -> labels to print
+const expiry = {}; // id -> 'YYYY-MM-DD' typed in for this batch (not saved: a stale date must never print)
 
 /* ── Utility ─────────────────────────────────────────────────────────── */
 const $ = sel => document.querySelector(sel);
@@ -257,10 +259,13 @@ function showToast(msg) {
     clearTimeout(showToast.timer);
     showToast.timer = setTimeout(() => t.classList.remove('show'), 2200);
 }
-function thaiDateTime(d = new Date()) {
-    const yy = String(d.getFullYear() + 543).slice(-2);
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${yy}   ${d.getHours()}:${mm} น.`;
+// "9 พ.ย. 2026" — Thai month, Christian year, as on the pharmacy label
+function thaiDate(d = new Date()) {
+    return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+function expText(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    return m ? thaiDate(new Date(+m[1], +m[2] - 1, +m[3])) : '....................';
 }
 function activeDrugs() { return list.drugs.filter(d => d.active !== false); }
 function drugById(id) { return list.drugs.find(d => d.id === id); }
@@ -306,20 +311,20 @@ function applySettings() {
 }
 
 /* ── Label markup ────────────────────────────────────────────────────── */
-function labelHTML(d, stamp) {
+function labelHTML(d, stamp, exp) {
     const g = GROUPS[d.group] || GROUPS.tablet;
     const warns = [...g.fixed, d.warn1, d.warn2].filter(Boolean);
     return `<div class="label">
-        <div class="l-name">ชื่อ<span class="blank"></span></div>
+        <div class="l-top"><span>วันที่จัด ${esc(stamp)}</span><span>วันหมดอายุ ${esc(expText(exp))}</span></div>
         <div class="l-sep"></div>
         <div class="l-drug"><span>${esc(d.name)} ${esc(d.unit)}</span><span class="pack"># ${esc(d.pack)}</span></div>
         <div class="l-dir">${g.dir.map(line => `<div>${esc(line)}</div>`).join('')}</div>
         <div class="l-fixed">${warns.map(w => `<div class="w">${esc(w)}</div>`).join('')}${d.indication ? `<div>${esc(d.indication)}</div>` : ''}</div>
-        <div class="l-foot"><span>${esc(settings.dept)}</span>${d.exp ? '<span>Exp ..................</span>' : ''}<span>${esc(stamp)}</span></div>
+        <div class="l-foot"><span>${esc(settings.dept)}</span></div>
     </div>`;
 }
-function stockPreviewHTML(d, stamp) {
-    return `<div class="stock"><div class="stock-head">โรงพยาบาลสันกำแพง ☎ (053) 446635-7</div>${labelHTML(d, stamp)}</div>`;
+function stockPreviewHTML(d, stamp, exp) {
+    return `<div class="stock"><div class="stock-head">โรงพยาบาลสันกำแพง ☎ (053) 446635-7</div>${labelHTML(d, stamp, exp)}</div>`;
 }
 
 /* ── Main table ──────────────────────────────────────────────────────── */
@@ -330,16 +335,17 @@ function renderRows() {
         const drugs = activeDrugs().filter(d => (GROUPS[d.group] || GROUPS.tablet).sec === sec)
             .filter(d => !q || d.name.toLowerCase().includes(q) || d.id.toLowerCase().includes(q));
         if (!drugs.length) continue;
-        rows.push(`<tr class="section"><td colspan="3">${esc(title)}</td></tr>`);
+        rows.push(`<tr class="section"><td colspan="4">${esc(title)}</td></tr>`);
         for (const d of drugs) {
             rows.push(`<tr data-id="${esc(d.id)}" class="${qty[d.id] > 0 ? 'on' : ''}">
-                <td><div class="drug-name">${esc(d.name)}</div><div class="drug-sub">${esc((GROUPS[d.group] || GROUPS.tablet).name)}${d.exp ? ' · มี Exp' : ''}</div></td>
+                <td><div class="drug-name">${esc(d.name)}</div><div class="drug-sub">${esc((GROUPS[d.group] || GROUPS.tablet).name)}</div></td>
                 <td class="num"># ${esc(d.pack)}</td>
+                <td class="num"><input type="date" data-exp value="${esc(expiry[d.id] || '')}"></td>
                 <td class="num"><select data-qty>${qtyOptions(d, qty[d.id])}</select></td>
             </tr>`);
         }
     }
-    $('#drug-rows').innerHTML = rows.join('') || '<tr><td colspan="3" class="empty">ไม่พบยา</td></tr>';
+    $('#drug-rows').innerHTML = rows.join('') || '<tr><td colspan="4" class="empty">ไม่พบยา</td></tr>';
 }
 
 // dropdown runs up to the most this drug the cart holds
@@ -363,11 +369,11 @@ function setQty(id, n) {
 }
 
 function renderPreview() {
-    const stamp = thaiDateTime();
+    const stamp = thaiDate();
     const items = activeDrugs().filter(d => qty[d.id] > 0);
     const total = items.reduce((s, d) => s + qty[d.id], 0);
     $('#previews').innerHTML = items.length
-        ? items.map(d => `<div class="preview-item"><span class="badge">× ${qty[d.id]}</span>${stockPreviewHTML(d, stamp)}</div>`).join('')
+        ? items.map(d => `<div class="preview-item"><span class="badge">× ${qty[d.id]}</span>${stockPreviewHTML(d, stamp, expiry[d.id])}</div>`).join('')
         : '<div class="empty">ยังไม่ได้เลือกยา<br>ใส่จำนวนในช่อง "พิมพ์"</div>';
     $('#preview-total').textContent = total ? `${items.length} รายการ · ${total} ใบ` : '';
     $('#print-count').textContent = total ? `(${total})` : '';
@@ -387,13 +393,13 @@ function fitPreviews() {
 }
 
 /* ── Printing ────────────────────────────────────────────────────────── */
-function printJob(items) {   // items: [{ id, n }]
-    const stamp = thaiDateTime();
+function printJob(items) {   // items: [{ id, n, exp }]
+    const stamp = thaiDate();
     const html = [];
-    for (const { id, n } of items) {
+    for (const { id, n, exp } of items) {
         const d = drugById(id);
         if (!d) continue;
-        for (let i = 0; i < n; i++) html.push(labelHTML(d, stamp));
+        for (let i = 0; i < n; i++) html.push(labelHTML(d, stamp, exp));
     }
     if (!html.length) return false;
     $('#print-area').innerHTML = html.join('');
@@ -402,7 +408,7 @@ function printJob(items) {   // items: [{ id, n }]
     return true;
 }
 function handlePrint() {
-    const items = activeDrugs().filter(d => qty[d.id] > 0).map(d => ({ id: d.id, n: qty[d.id] }));
+    const items = activeDrugs().filter(d => qty[d.id] > 0).map(d => ({ id: d.id, n: qty[d.id], exp: expiry[d.id] || '' }));
     if (!items.length) { showToast('ยังไม่ได้เลือกยา'); return; }
     if (printJob(items)) {
         store(LS.last, items);
@@ -417,6 +423,7 @@ function reprintLast() {
 }
 function clearAll() {
     for (const k of Object.keys(qty)) delete qty[k];
+    for (const k of Object.keys(expiry)) delete expiry[k];
     renderRows(); renderPreview();
     showToast('ล้างค่าแล้ว');
 }
@@ -427,7 +434,7 @@ function addLog(items, reprint = false) {
     log.unshift({
         time: new Date().toISOString(),
         reprint,
-        items: items.map(({ id, n }) => ({ name: (drugById(id) || { name: id }).name, n })),
+        items: items.map(({ id, n, exp }) => ({ name: (drugById(id) || { name: id }).name, n, exp: exp || '' })),
     });
     store(LS.log, log.slice(0, 2000));
 }
@@ -437,15 +444,15 @@ function renderLog() {
         <tr><th>วันเวลา</th><th>รายการ</th><th>รวม (ใบ)</th></tr>
         ${log.map(e => `<tr>
             <td>${esc(new Date(e.time).toLocaleString('th-TH'))}${e.reprint ? '<br><span class="hint">พิมพ์ซ้ำ</span>' : ''}</td>
-            <td>${e.items.map(i => `${esc(i.name)} × ${i.n}`).join('<br>')}</td>
+            <td>${e.items.map(i => `${esc(i.name)} × ${i.n}${i.exp ? ` <span class="hint">(หมดอายุ ${esc(expText(i.exp))})</span>` : ''}`).join('<br>')}</td>
             <td>${e.items.reduce((s, i) => s + i.n, 0)}</td></tr>`).join('')}
     </table>` : '<div class="empty">ยังไม่มีบันทึก</div>';
 }
 function exportLogCSV() {
     const log = load(LS.log, []);
-    const lines = ['datetime,drug,labels,reprint'];
+    const lines = ['datetime,drug,labels,expiry,reprint'];
     for (const e of log) for (const i of e.items) {
-        lines.push([e.time, '"' + i.name.replace(/"/g, '""') + '"', i.n, e.reprint ? 'yes' : ''].join(','));
+        lines.push([e.time, '"' + i.name.replace(/"/g, '""') + '"', i.n, i.exp || '', e.reprint ? 'yes' : ''].join(','));
     }
     download('dent-print-log.csv', '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
 }
@@ -492,7 +499,7 @@ function groupOptions(sel) {
     return Object.entries(GROUPS).map(([k, g]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${esc(g.name)}</option>`).join('');
 }
 function renderAdminTable() {
-    $('#admin-table').innerHTML = `<tr><th>#</th><th>ชื่อยาบนฉลาก</th><th>หน่วย</th><th># บรรจุ</th><th>มีในตู้สูงสุด</th><th>กลุ่มฉลาก</th><th>คำเตือน 1</th><th>คำเตือน 2</th><th>ข้อบ่งใช้</th><th>Exp</th><th>ใช้งาน</th><th></th></tr>` +
+    $('#admin-table').innerHTML = `<tr><th>#</th><th>ชื่อยาบนฉลาก</th><th>หน่วย</th><th># บรรจุ</th><th>มีในตู้สูงสุด</th><th>กลุ่มฉลาก</th><th>คำเตือน 1</th><th>คำเตือน 2</th><th>ข้อบ่งใช้</th><th>ใช้งาน</th><th></th></tr>` +
         draft.map((d, i) => `<tr data-i="${i}">
             <td>${i + 1}</td>
             <td><input type="text" class="w-name" data-f="name" value="${esc(d.name)}"></td>
@@ -503,7 +510,6 @@ function renderAdminTable() {
             <td><input type="text" class="w-line" data-f="warn1" value="${esc(d.warn1)}"></td>
             <td><input type="text" class="w-line" data-f="warn2" value="${esc(d.warn2)}"></td>
             <td><input type="text" class="w-line" data-f="indication" value="${esc(d.indication)}"></td>
-            <td><input type="checkbox" data-f="exp"${d.exp ? ' checked' : ''}></td>
             <td><input type="checkbox" data-f="active"${d.active !== false ? ' checked' : ''}></td>
             <td><button class="danger" data-del title="ลบ">✕</button></td>
         </tr>`).join('');
@@ -566,6 +572,10 @@ $('#drug-rows').addEventListener('input', e => {
     const tr = e.target.closest('tr[data-id]');
     if (!tr) return;
     if (e.target.matches('[data-qty]')) setQty(tr.dataset.id, e.target.value);
+    if (e.target.matches('[data-exp]')) {
+        if (e.target.value) expiry[tr.dataset.id] = e.target.value; else delete expiry[tr.dataset.id];
+        renderPreview();
+    }
 });
 $('#btn-print').addEventListener('click', handlePrint);
 $('#btn-reprint').addEventListener('click', reprintLast);
@@ -597,7 +607,7 @@ $('#admin-table').addEventListener('click', e => {
     if (confirm(`ลบ ${draft[i].name || 'แถวนี้'}?`)) { draft.splice(i, 1); renderAdminTable(); }
 });
 $('#btn-add-drug').addEventListener('click', () => {
-    draft.push({ id: 'd' + Date.now(), name: '', unit: 'เม็ด', pack: 10, max: 5, group: 'tablet', warn1: '', warn2: '', indication: '', exp: false, active: true });
+    draft.push({ id: 'd' + Date.now(), name: '', unit: 'เม็ด', pack: 10, max: 5, group: 'tablet', warn1: '', warn2: '', indication: '', active: true });
     renderAdminTable();
     const wrap = document.querySelector('.admin-table-wrap');
     wrap.scrollTop = wrap.scrollHeight;
